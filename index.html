@@ -393,6 +393,7 @@
 const BUDGET    = 600;
 const WEEKLY    = 600;
 const KEY       = 'actv2';
+const KEY_OLD   = 'actv1';
 const PIN_KEY   = 'act_pin';
 const THEME_KEY = 'act_theme';
 const MONTHS    = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -533,7 +534,16 @@ function handleModalSubmit() {
 }
 
 /* ── DATA ── */
-function load() { try { const d = localStorage.getItem(KEY); if (d) state = JSON.parse(d); } catch(e) {} }
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY) || localStorage.getItem(KEY_OLD);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      state = { total:0, bill:0, bank:0, expenses:[], ...parsed };
+      save();
+    }
+  } catch(e) {}
+}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {} }
 
 function currentSpent() {
