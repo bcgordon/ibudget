@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Card Tracker</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Card Tracker">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --font: 'DM Sans', -apple-system, sans-serif;
+      --mono: 'DM Mono', monospace;
+      --radius: 14px;
+      --safe-top: env(safe-area-inset-top);
+      --safe-bottom: env(safe-area-inset-bottom);
+      --bg: #f5f5f7;
+      --surface: #ffffff;
+      --surface2: #f0f0f2;
+      --border: rgba(0,0,0,0.08);
+      --border2: rgba(0,0,0,0.13);
+      --text: #1d1d1f;
+      --text2: #6e6e73;
+      --text3: #aeaeb2;
+      --accent: #1d1d1f;
+      --good: #28a745;
+      --warn: #d4820a;
+      --bad: #c0392b;
+      --tab-bar-bg: rgba(245,245,247,0.92);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000000;
+        --surface: #1c1c1e;
+        --surface2: #2c2c2e;
+        --border: rgba(255,255,255,0.08);
+        --border2: rgba(255,255,255,0.15);
+        --text: #f5f5f7;
+        --text2: #98989d;
+        --text3: #636366;
+        --accent: #f5f5f7;
+        --good: #30d158;
+        --warn: #ffd60a;
+        --bad: #ff453a;
+        --tab-bar-bg: rgba(28,28,30,0.92);
+      }
+    }
+
+    html, body {
+      height: 100%; height: 100dvh;
+      background: var(--bg);
+      font-family: var(--font);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* ── PIN LOCK SCREEN ── */
+    #pin-screen {
+      position: fixed; inset: 0; z-index: 999;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding-bottom: calc(var(--safe-bottom) + 20px);
+      gap: 0;
+    }
+
+    #pin-screen.hidden { display: none; }
+
+    .pin-icon {
+      width: 72px; height: 72px;
+      border-radius: 18px;
+      overflow: hidden;
+      margin-bottom: 22px;
+    }
+
+    .pin-icon img { width: 100%; height: 100%; object-fit: cover; }
+
+    .pin-title {
+      font-size: 20px; font-weight: 500;
+      letter-spacing: -0.3px;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+
+    .pin-subtitle {
+      font-size: 14px; color: var(--text2);
+      margin-bottom: 32px;
+      min-height: 20px;
+      transition: color 0.2s;
+    }
+
+    .pin-subtitle.error { color: var(--bad); }
+
+    /* PIN dots */
+    .pin-dots {
+      display: flex; gap: 14px;
+      margin-bottom: 40px;
+    }
+
+    .pin-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      border: 1.5px solid var(--text3);
+      background: transparent;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+
+    .pin-dot.filled {
+      background: var(--text);
+      border-color: var(--text);
+      transform: scale(1.05);
+    }
+
+    .pin-dot.shake { animation: shake 0.35s ease; }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20% { transform: translateX(-6px); }
+      40% { transform: translateX(6px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+
+    /* Numpad */
+    .numpad {
+      display: grid;
+      grid-template-columns: repeat(3, 72px);
+      grid-template-rows: repeat(4, 72px);
+      gap: 12px;
+    }
+
+    .num-btn {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      border: none;
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 22px;
+      font-weight: 400;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.1s, transform 0.08s;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .num-btn:active { background: var(--surface2); transform: scale(0.94); }
+    .num-btn.empty { background: transparent; cursor: default; pointer-events: none; }
+    .num-btn.del { font-size: 18px; background: transparent; }
+    .num-btn.del:active { background: var(--surface2); }
+
+    /* ── MAIN APP ── */
+    #app {
+      display: flex; flex-direction: column;
+      height: 100%; height: 100dvh;
+    }
+
+    .status-bar-spacer {
+      height: calc(var(--safe-top) + 8px);
+      background: var(--bg); flex-shrink: 0;
+    }
+
+    .header {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 4px 20px 12px; flex-shrink: 0;
+    }
+
+    .header h1 {
+      font-size: 22px; font-weight: 500;
+      letter-spacing: -0.4px; color: var(--text);
+    }
+
+    .budget-pill {
+      font-size: 12px; font-weight: 500;
+      color: var(--text2); background: var(--surface2);
+      padding: 4px 10px; border-radius: 99px;
+    }
+
+    .scroll-area {
+      flex: 1; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 16px;
+      padding-bottom: calc(80px + var(--safe-bottom));
+    }
+
+    /* STATS */
+    .stats {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 8px; margin-bottom: 12px;
+    }
+
+    .stat {
+      background: var(--surface); border-radius: var(--radius);
+      padding: 12px; border: 0.5px solid var(--border);
+    }
+
+    .stat-label {
+      font-size: 10px; font-weight: 500; color: var(--text3);
+      text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 5px;
+    }
+
+    .stat-value {
+      font-family: var(--mono); font-size: 19px;
+      font-weight: 500; letter-spacing: -0.5px; color: var(--text);
+    }
+
+    .stat-value.good { color: var(--good); }
+    .stat-value.warn { color: var(--warn); }
+    .stat-value.bad  { color: var(--bad); }
+
+    /* PROGRESS */
+    .progress-card {
+      background: var(--surface); border-radius: var(--radius);
+      padding: 14px 16px; margin-bottom: 12px;
+      border: 0.5px solid var(--border);
+    }
+
+    .progress-header {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: var(--text2); margin-bottom: 9px;
+    }
+
+    .progress-track {
+      height: 5px; background: var(--surface2);
+      border-radius: 99px; overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%; border-radius: 99px;
+      background: var(--good); transition: width 0.4s ease;
+    }
+
+    .progress-fill.warn { background: var(--warn); }
+    .progress-fill.bad  { background: var(--bad); }
+
+    /* CARDS */
+    .card {
+      background: var(--surface); border-radius: var(--radius);
+      padding: 14px 16px; margin-bottom: 12px;
+      border: 0.5px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 11px; font-weight: 500; color: var(--text3);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;
+    }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field.full { grid-column: 1 / -1; }
+
+    .field label { font-size: 12px; color: var(--text2); }
+
+    .field input {
+      font-family: var(--font); font-size: 16px;
+      padding: 9px 12px;
+      border: 0.5px solid var(--border2);
+      border-radius: 10px;
+      background: var(--surface2); color: var(--text);
+      outline: none; -webkit-appearance: none; width: 100%;
+      transition: border-color 0.15s;
+    }
+
+    .field input:focus { border-color: var(--accent); background: var(--surface); }
+
+    .btn {
+      font-family: var(--font); font-size: 15px; font-weight: 500;
+      padding: 11px; border-radius: 10px; cursor: pointer; border: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s, transform 0.1s;
+      width: 100%; margin-top: 12px;
+    }
+
+    .btn:active { transform: scale(0.98); opacity: 0.8; }
+    .btn-primary { background: var(--accent); color: var(--bg); }
+    .btn-danger  { background: var(--bad); color: #fff; }
+
+    /* EXPENSE LIST */
+    .expense-item {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 10px 0; border-bottom: 0.5px solid var(--border);
+    }
+
+    .expense-item:last-child { border-bottom: none; }
+    .expense-loc { font-size: 14px; color: var(--text); }
+    .expense-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+    .expense-right { display: flex; align-items: center; gap: 12px; }
+
+    .expense-amt { font-family: var(--mono); font-size: 14px; font-weight: 500; color: var(--text); }
+
+    .del-btn {
+      background: none; border: none; color: var(--text3);
+      font-size: 20px; line-height: 1; cursor: pointer; padding: 0 2px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .empty {
+      text-align: center; padding: 20px 0;
+      font-size: 13px; color: var(--text3);
+    }
+
+    .row-actions { display: flex; justify-content: flex-end; margin-top: -4px; margin-bottom: 10px; }
+
+    .btn-ghost {
+      background: none; border: none; font-family: var(--font);
+      font-size: 12px; color: var(--text3); cursor: pointer; padding: 2px 4px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* PROJECTIONS */
+    .proj-note { font-size: 13px; color: var(--text2); line-height: 1.55; margin-bottom: 14px; }
+
+    .proj-item {
+      background: var(--surface); border-radius: var(--radius);
+      border: 0.5px solid var(--border);
+      padding: 12px 14px; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 12px;
+    }
+
+    .proj-item.this-month { border-color: var(--border2); }
+    .proj-month { font-size: 13px; font-weight: 500; min-width: 46px; color: var(--text); }
+
+    .proj-track {
+      flex: 1; height: 4px; background: var(--surface2);
+      border-radius: 99px; overflow: hidden;
+    }
+
+    .proj-fill { height: 100%; border-radius: 99px; transition: width 0.5s ease; }
+    .proj-fill.good { background: var(--good); }
+    .proj-fill.warn { background: var(--warn); }
+    .proj-fill.bad  { background: var(--bad); }
+
+    .proj-amt { font-family: var(--mono); font-size: 13px; font-weight: 500; min-width: 52px; text-align: right; color: var(--text); }
+    .proj-tag { font-size: 10px; color: var(--text3); min-width: 42px; text-align: right; }
+    .proj-tag.over { color: var(--bad); }
+
+    /* SETTINGS */
+    .settings-section { margin-bottom: 24px; }
+
+    .settings-label {
+      font-size: 11px; font-weight: 500; color: var(--text3);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 0 4px; margin-bottom: 8px;
+    }
+
+    .settings-row {
+      background: var(--surface); border-radius: var(--radius);
+      border: 0.5px solid var(--border);
+      padding: 14px 16px; margin-bottom: 1px;
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+
+    .settings-row:first-of-type { border-radius: var(--radius) var(--radius) 4px 4px; }
+    .settings-row:last-of-type  { border-radius: 4px 4px var(--radius) var(--radius); margin-bottom: 0; }
+    .settings-row:only-of-type  { border-radius: var(--radius); }
+
+    .settings-row-label { font-size: 15px; color: var(--text); }
+    .settings-row-value { font-size: 14px; color: var(--text3); }
+
+    .settings-chevron { font-size: 16px; color: var(--text3); margin-left: 6px; }
+
+    /* PIN change modal overlay */
+    #pin-modal {
+      position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,0.45);
+      display: flex; align-items: flex-end;
+      transition: opacity 0.25s;
+    }
+
+    #pin-modal.hidden { display: none; }
+
+    .pin-modal-sheet {
+      background: var(--bg);
+      border-radius: 20px 20px 0 0;
+      padding: 20px 0 calc(var(--safe-bottom) + 20px);
+      width: 100%;
+      display: flex; flex-direction: column; align-items: center;
+    }
+
+    .pin-modal-handle {
+      width: 36px; height: 4px; border-radius: 99px;
+      background: var(--border2); margin-bottom: 20px;
+    }
+
+    .pin-modal-title {
+      font-size: 17px; font-weight: 500; margin-bottom: 6px; color: var(--text);
+    }
+
+    /* TAB BAR */
+    .tab-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--tab-bar-bg);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      border-top: 0.5px solid var(--border);
+      display: flex;
+      padding-bottom: var(--safe-bottom);
+      z-index: 100;
+    }
+
+    .tab-btn {
+      flex: 1; background: none; border: none;
+      padding: 10px 0 8px;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      color: var(--text3); font-family: var(--font);
+      font-size: 10px; font-weight: 400; transition: color 0.15s;
+    }
+
+    .tab-btn.active { color: var(--text); font-weight: 500; }
+    .tab-icon { width: 24px; height: 24px; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* TOAST */
+    .toast {
+      position: fixed;
+      bottom: calc(72px + var(--safe-bottom) + 12px);
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: var(--text); color: var(--bg);
+      font-size: 13px; font-weight: 500;
+      padding: 8px 18px; border-radius: 99px;
+      opacity: 0; transition: all 0.22s ease;
+      pointer-events: none; white-space: nowrap; z-index: 300;
+    }
+
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<!-- ── PIN LOCK SCREEN ── -->
+<div id="pin-screen">
+  <div class="pin-icon">
+    <img src="icons/icon-180.png" alt="App icon">
+  </div>
+  <div class="pin-title" id="pin-title">Enter PIN</div>
+  <div class="pin-subtitle" id="pin-subtitle">Enter your 4-digit PIN</div>
+
+  <div class="pin-dots" id="pin-dots">
+    <div class="pin-dot" id="d0"></div>
+    <div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div>
+    <div class="pin-dot" id="d3"></div>
+  </div>
+
+  <div class="numpad" id="pin-numpad">
+    <button class="num-btn" onclick="pinKey('1')">1</button>
+    <button class="num-btn" onclick="pinKey('2')">2</button>
+    <button class="num-btn" onclick="pinKey('3')">3</button>
+    <button class="num-btn" onclick="pinKey('4')">4</button>
+    <button class="num-btn" onclick="pinKey('5')">5</button>
+    <button class="num-btn" onclick="pinKey('6')">6</button>
+    <button class="num-btn" onclick="pinKey('7')">7</button>
+    <button class="num-btn" onclick="pinKey('8')">8</button>
+    <button class="num-btn" onclick="pinKey('9')">9</button>
+    <button class="num-btn empty"></button>
+    <button class="num-btn" onclick="pinKey('0')">0</button>
+    <button class="num-btn del" onclick="pinBackspace()">⌫</button>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="app">
+
+  <div class="status-bar-spacer"></div>
+
+  <div class="header">
+    <h1>Apple Card</h1>
+    <div class="budget-pill">$600 / mo</div>
+  </div>
+
+  <div class="scroll-area">
+
+    <!-- SPENDING -->
+    <div class="panel active" id="panel-spending">
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">This month</div>
+          <div class="stat-value" id="stat-current">$0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Remaining</div>
+          <div class="stat-value good" id="stat-remaining">$600</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Budget</div>
+          <div class="stat-value">$600</div>
+        </div>
+      </div>
+
+      <div class="progress-card">
+        <div class="progress-header">
+          <span id="prog-label">$0 of $600 used</span>
+          <span id="prog-pct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="prog-fill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Card balance</div>
+        <div class="field-row">
+          <div class="field">
+            <label>Current total balance</label>
+            <input type="number" inputmode="decimal" id="input-total" placeholder="0.00" min="0" step="0.01" oninput="saveAndRender()">
+          </div>
+          <div class="field">
+            <label>Next month's bill</label>
+            <input type="number" inputmode="decimal" id="input-bill" placeholder="0.00" min="0" step="0.01" oninput="saveAndRender()">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Add expense</div>
+        <div class="field-row">
+          <div class="field">
+            <label>Amount</label>
+            <input type="number" inputmode="decimal" id="exp-amount" placeholder="0.00" min="0" step="0.01">
+          </div>
+          <div class="field">
+            <label>Merchant / location</label>
+            <input type="text" id="exp-loc" placeholder="e.g. Trader Joe's">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="addExpense()">Add expense</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0;">
+          <span>Expenses this month</span>
+        </div>
+        <div class="row-actions">
+          <button class="btn-ghost" onclick="clearExpenses()">Clear all</button>
+        </div>
+        <div id="expense-list"><div class="empty">No expenses added yet.</div></div>
+      </div>
+    </div>
+
+    <!-- PROJECTIONS -->
+    <div class="panel" id="panel-projections">
+      <p class="proj-note" id="proj-note"></p>
+      <div id="proj-grid"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="panel" id="panel-settings">
+      <div class="settings-section">
+        <div class="settings-label">Security</div>
+        <div class="settings-row" onclick="openChangePIN()">
+          <span class="settings-row-label">Change PIN</span>
+          <span>
+            <span class="settings-row-value">4-digit</span>
+            <span class="settings-chevron">›</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-label">About</div>
+        <div class="settings-row" style="cursor:default;">
+          <span class="settings-row-label">Budget</span>
+          <span class="settings-row-value">$600 / month</span>
+        </div>
+        <div class="settings-row" style="cursor:default;">
+          <span class="settings-row-label">Storage</span>
+          <span class="settings-row-value">On-device</span>
+        </div>
+        <div class="settings-row" style="cursor:default;">
+          <span class="settings-row-label">Version</span>
+          <span class="settings-row-value">1.1</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-spending" onclick="switchTab('spending')">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="5" width="20" height="14" rx="2"/>
+        <path d="M2 10h20"/>
+      </svg>
+      Spending
+    </button>
+    <button class="tab-btn" id="tab-projections" onclick="switchTab('projections')">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+        <polyline points="16 7 22 7 22 13"/>
+      </svg>
+      Projections
+    </button>
+    <button class="tab-btn" id="tab-settings" onclick="switchTab('settings')">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+      </svg>
+      Settings
+    </button>
+  </div>
+</div>
+
+<!-- PIN CHANGE MODAL -->
+<div id="pin-modal" class="hidden">
+  <div class="pin-modal-sheet">
+    <div class="pin-modal-handle"></div>
+    <div class="pin-modal-title" id="modal-title">Change PIN</div>
+    <div class="pin-subtitle" id="modal-subtitle" style="margin-bottom:24px;">Enter your current PIN</div>
+
+    <div class="pin-dots" id="modal-dots">
+      <div class="pin-dot" id="md0"></div>
+      <div class="pin-dot" id="md1"></div>
+      <div class="pin-dot" id="md2"></div>
+      <div class="pin-dot" id="md3"></div>
+    </div>
+
+    <div class="numpad">
+      <button class="num-btn" onclick="modalKey('1')">1</button>
+      <button class="num-btn" onclick="modalKey('2')">2</button>
+      <button class="num-btn" onclick="modalKey('3')">3</button>
+      <button class="num-btn" onclick="modalKey('4')">4</button>
+      <button class="num-btn" onclick="modalKey('5')">5</button>
+      <button class="num-btn" onclick="modalKey('6')">6</button>
+      <button class="num-btn" onclick="modalKey('7')">7</button>
+      <button class="num-btn" onclick="modalKey('8')">8</button>
+      <button class="num-btn" onclick="modalKey('9')">9</button>
+      <button class="num-btn del" onclick="modalClose()" style="font-size:13px;color:var(--text2);">Cancel</button>
+      <button class="num-btn" onclick="modalKey('0')">0</button>
+      <button class="num-btn del" onclick="modalBackspace()">⌫</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BUDGET = 600;
+const KEY     = 'actv1';
+const PIN_KEY = 'act_pin';
+const MONTHS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DEFAULT_PIN = '1234';
+
+let state = { total: 0, bill: 0, expenses: [] };
+
+/* ── PIN LOCK LOGIC ── */
+let pinBuffer    = '';
+let pinLocked    = true;
+let pinSetupMode = false;   // first-time setup
+let pinNewBuffer = '';       // holds new PIN during change flow
+
+function getStoredPIN() {
+  return localStorage.getItem(PIN_KEY) || null;
+}
+
+function initPinScreen() {
+  const stored = getStoredPIN();
+  if (!stored) {
+    // First launch — set up a new PIN
+    pinSetupMode = true;
+    document.getElementById('pin-title').textContent = 'Create a PIN';
+    document.getElementById('pin-subtitle').textContent = 'Choose a 4-digit PIN';
+  } else {
+    pinSetupMode = false;
+    document.getElementById('pin-title').textContent = 'Enter PIN';
+    document.getElementById('pin-subtitle').textContent = 'Enter your 4-digit PIN';
+  }
+  pinBuffer = '';
+  updateDots('pin-dots', 'd', 0);
+}
+
+function pinKey(d) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += d;
+  updateDots('pin-dots', 'd', pinBuffer.length);
+  if (pinBuffer.length === 4) {
+    setTimeout(() => handlePinSubmit(), 120);
+  }
+}
+
+function pinBackspace() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updateDots('pin-dots', 'd', pinBuffer.length);
+}
+
+function handlePinSubmit() {
+  const stored = getStoredPIN();
+
+  if (pinSetupMode) {
+    if (!pinNewBuffer) {
+      // First entry of new PIN
+      pinNewBuffer = pinBuffer;
+      pinBuffer = '';
+      updateDots('pin-dots', 'd', 0);
+      document.getElementById('pin-subtitle').textContent = 'Confirm your PIN';
+    } else {
+      // Confirm
+      if (pinBuffer === pinNewBuffer) {
+        localStorage.setItem(PIN_KEY, pinBuffer);
+        unlockApp();
+      } else {
+        pinNewBuffer = '';
+        pinBuffer = '';
+        showPinError('pin-subtitle', 'PINs didn\'t match — try again');
+        shakeDots('pin-dots', 'd');
+        document.getElementById('pin-subtitle').textContent = 'Choose a 4-digit PIN';
+      }
+    }
+  } else {
+    if (pinBuffer === stored) {
+      unlockApp();
+    } else {
+      pinBuffer = '';
+      shakeDots('pin-dots', 'd');
+      showPinError('pin-subtitle', 'Incorrect PIN — try again');
+    }
+  }
+}
+
+function unlockApp() {
+  pinLocked = false;
+  document.getElementById('pin-screen').classList.add('hidden');
+}
+
+function updateDots(containerId, prefix, count) {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById(prefix + i).classList.toggle('filled', i < count);
+  }
+}
+
+function shakeDots(containerId, prefix) {
+  for (let i = 0; i < 4; i++) {
+    const el = document.getElementById(prefix + i);
+    el.classList.add('shake');
+    el.addEventListener('animationend', () => el.classList.remove('shake'), { once: true });
+  }
+  updateDots(containerId, prefix, 0);
+}
+
+function showPinError(elId, msg) {
+  const el = document.getElementById(elId);
+  el.textContent = msg;
+  el.classList.add('error');
+  setTimeout(() => {
+    el.classList.remove('error');
+  }, 2000);
+}
+
+/* ── PIN CHANGE MODAL ── */
+let modalStep    = 'current'; // 'current' | 'new' | 'confirm'
+let modalBuf     = '';
+let modalNewPin  = '';
+
+function openChangePIN() {
+  modalStep   = 'current';
+  modalBuf    = '';
+  modalNewPin = '';
+  document.getElementById('modal-title').textContent    = 'Change PIN';
+  document.getElementById('modal-subtitle').textContent = 'Enter your current PIN';
+  updateDots('modal-dots', 'md', 0);
+  document.getElementById('pin-modal').classList.remove('hidden');
+}
+
+function modalClose() {
+  document.getElementById('pin-modal').classList.add('hidden');
+  modalBuf = ''; modalNewPin = '';
+}
+
+function modalKey(d) {
+  if (modalBuf.length >= 4) return;
+  modalBuf += d;
+  updateDots('modal-dots', 'md', modalBuf.length);
+  if (modalBuf.length === 4) setTimeout(() => handleModalSubmit(), 120);
+}
+
+function modalBackspace() {
+  modalBuf = modalBuf.slice(0, -1);
+  updateDots('modal-dots', 'md', modalBuf.length);
+}
+
+function handleModalSubmit() {
+  const stored = getStoredPIN();
+
+  if (modalStep === 'current') {
+    if (modalBuf === stored) {
+      modalStep = 'new';
+      modalBuf  = '';
+      updateDots('modal-dots', 'md', 0);
+      document.getElementById('modal-subtitle').textContent = 'Enter your new PIN';
+    } else {
+      modalBuf = '';
+      shakeDots('modal-dots', 'md');
+      showPinError('modal-subtitle', 'Incorrect PIN — try again');
+      setTimeout(() => {
+        document.getElementById('modal-subtitle').textContent = 'Enter your current PIN';
+      }, 2100);
+    }
+
+  } else if (modalStep === 'new') {
+    modalNewPin = modalBuf;
+    modalStep   = 'confirm';
+    modalBuf    = '';
+    updateDots('modal-dots', 'md', 0);
+    document.getElementById('modal-subtitle').textContent = 'Confirm your new PIN';
+
+  } else if (modalStep === 'confirm') {
+    if (modalBuf === modalNewPin) {
+      localStorage.setItem(PIN_KEY, modalBuf);
+      modalClose();
+      showToast('PIN updated');
+    } else {
+      modalBuf    = '';
+      modalNewPin = '';
+      modalStep   = 'new';
+      shakeDots('modal-dots', 'md');
+      showPinError('modal-subtitle', 'PINs didn\'t match — try again');
+      setTimeout(() => {
+        document.getElementById('modal-subtitle').textContent = 'Enter your new PIN';
+      }, 2100);
+    }
+  }
+}
+
+/* ── APP DATA ── */
+function load() {
+  try { const d = localStorage.getItem(KEY); if (d) state = JSON.parse(d); } catch(e) {}
+}
+
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+function currentSpent() {
+  const base = Math.max(0, (state.total || 0) - (state.bill || 0));
+  return base + state.expenses.reduce((s, e) => s + e.amount, 0);
+}
+
+function colorClass(amt) {
+  const p = amt / BUDGET;
+  return p >= 1 ? 'bad' : p >= 0.8 ? 'warn' : 'good';
+}
+
+function fmt(n) {
+  return '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
+}
+
+function saveAndRender() {
+  state.total = parseFloat(document.getElementById('input-total').value) || 0;
+  state.bill  = parseFloat(document.getElementById('input-bill').value)  || 0;
+  save(); render();
+}
+
+function render() {
+  const spent = currentSpent();
+  const rem   = BUDGET - spent;
+  const pct   = Math.min(100, Math.round((spent / BUDGET) * 100));
+  const cls   = colorClass(spent);
+
+  document.getElementById('stat-current').textContent = fmt(spent);
+  const remEl = document.getElementById('stat-remaining');
+  remEl.textContent = fmt(rem);
+  remEl.className = 'stat-value ' + cls;
+
+  document.getElementById('prog-label').textContent = `${fmt(spent)} of $600 used`;
+  document.getElementById('prog-pct').textContent = pct + '%';
+  const fill = document.getElementById('prog-fill');
+  fill.style.width = pct + '%';
+  fill.className = 'progress-fill ' + (cls === 'good' ? '' : cls);
+
+  renderExpenses();
+  renderProjections(spent);
+}
+
+function renderExpenses() {
+  const el = document.getElementById('expense-list');
+  if (!state.expenses.length) {
+    el.innerHTML = '<div class="empty">No expenses added yet.</div>';
+    return;
+  }
+  el.innerHTML = [...state.expenses].reverse().map((e, ri) => {
+    const i = state.expenses.length - 1 - ri;
+    return `<div class="expense-item">
+      <div>
+        <div class="expense-loc">${e.loc}</div>
+        <div class="expense-meta">${e.date}</div>
+      </div>
+      <div class="expense-right">
+        <div class="expense-amt">${fmt(e.amount)}</div>
+        <button class="del-btn" onclick="deleteExpense(${i})">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderProjections(spent) {
+  const now  = new Date();
+  document.getElementById('proj-note').textContent =
+    `Current month reflects your actual spending so far (${fmt(spent)}). ` +
+    `Month 2 uses your next bill (${fmt(state.bill || 0)}). Remaining months assume $600/mo.`;
+
+  let html = '';
+  for (let i = 0; i < 6; i++) {
+    const d   = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const lbl = MONTHS[d.getMonth()] + ' \'' + String(d.getFullYear()).slice(2);
+    const amt = i === 0 ? spent : i === 1 ? (state.bill || 0) : BUDGET;
+    const pct = Math.min(100, Math.round((amt / BUDGET) * 100));
+    const cls = colorClass(amt);
+    const over = amt > BUDGET;
+    const tag  = i === 0 ? 'actual' : i === 1 ? 'bill' : 'est.';
+    html += `<div class="proj-item ${i === 0 ? 'this-month' : ''}">
+      <div class="proj-month">${lbl}</div>
+      <div class="proj-track"><div class="proj-fill ${cls}" style="width:${pct}%"></div></div>
+      <div class="proj-amt">${fmt(amt)}</div>
+      <div class="proj-tag ${over ? 'over' : ''}">${over ? '+' + fmt(amt - BUDGET) : tag}</div>
+    </div>`;
+  }
+  document.getElementById('proj-grid').innerHTML = html;
+}
+
+function addExpense() {
+  const amt = parseFloat(document.getElementById('exp-amount').value);
+  const loc = document.getElementById('exp-loc').value.trim() || 'Unknown';
+  if (!amt || amt <= 0) { showToast('Enter a valid amount'); return; }
+  const now = new Date();
+  state.expenses.push({ amount: amt, loc, date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) });
+  document.getElementById('exp-amount').value = '';
+  document.getElementById('exp-loc').value = '';
+  save(); render();
+  showToast('Expense added');
+}
+
+function deleteExpense(i) {
+  state.expenses.splice(i, 1);
+  save(); render();
+}
+
+function clearExpenses() {
+  if (!state.expenses.length) return;
+  state.expenses = [];
+  save(); render();
+  showToast('Expenses cleared');
+}
+
+function switchTab(tab) {
+  ['spending', 'projections', 'settings'].forEach(t => {
+    document.getElementById('panel-' + t).classList.toggle('active', t === tab);
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+}
+
+load();
+if (state.total) document.getElementById('input-total').value = state.total;
+if (state.bill)  document.getElementById('input-bill').value  = state.bill;
+render();
+initPinScreen();
+</script>
+</body>
+</html>
