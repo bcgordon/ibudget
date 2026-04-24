@@ -637,18 +637,22 @@ function lastDayStr(yr, mo) {
 function renderProjections(currentMonthSpent) {
   const now      = new Date();
   const bank     = state.bank || 0;
-  const nextBill = state.bill || 0;
 
-  // Expenses logged this month → will become next month's bill
-  const nextMonthBill = state.expenses.reduce((s,e) => s + e.amount, 0) || BUDGET;
+  // i=0 → current month (April): bill = next bill statement, due Apr 30
+  // i=1 → next month (May): bill = sum of expenses logged in April, due May 31
+  // i=2+ → estimated at $600
 
-  // Summary card
-  const afterBill = bank - nextBill;
+  const knownBill      = state.bill || 0;
+  const loggedExpenses = state.expenses.reduce((s,e) => s + e.amount, 0);
+  const may_bill       = loggedExpenses > 0 ? loggedExpenses : BUDGET;
+
+  // Summary card: after the known bill hits at end of this month
+  const afterBill = bank - knownBill;
   const afterEl   = document.getElementById('proj-after-bill');
   afterEl.textContent = fmt(afterBill);
   afterEl.className   = 'proj-bank-value ' + moneyColor(afterBill);
   document.getElementById('proj-after-sub').textContent =
-    `${fmt(bank)} bank − ${fmt(nextBill)} bill due ${lastDayStr(now.getFullYear(), now.getMonth())}`;
+    `${fmt(bank)} bank − ${fmt(knownBill)} bill due ${lastDayStr(now.getFullYear(), now.getMonth())}`;
 
   let runningBank = bank;
   let html = '';
@@ -657,16 +661,26 @@ function renderProjections(currentMonthSpent) {
     const totalMonths = now.getMonth() + i;
     const yr  = now.getFullYear() + Math.floor(totalMonths / 12);
     const mo  = totalMonths % 12;
-    const lbl = MONTHS[mo] + ' \'' + String(yr).slice(2);
+    const lbl = MONTHS[mo] + '\'' + String(yr).slice(2);
 
     const fridayCount = i === 0 ? fridaysRemainingThisMonth() : countFridaysInMonth(yr, mo);
     const income = fridayCount * WEEKLY;
 
-    // Bill deducted at end of each month
+    // Bill assignment:
+    // Month 0 (current month) → known statement bill
+    // Month 1 (next month)    → logged expenses this month become that bill
+    // Month 2+                → estimated $600
     let bill, billNote;
-    if (i === 0) { bill = nextBill;       billNote = 'Known next bill'; }
-    else if (i === 1) { bill = nextMonthBill; billNote = state.expenses.length ? 'Bill (logged expenses)' : 'Est. bill ($600)'; }
-    else { bill = BUDGET; billNote = 'Est. bill ($600)'; }
+    if (i === 0) {
+      bill     = knownBill;
+      billNote = 'Statement bill';
+    } else if (i === 1) {
+      bill     = may_bill;
+      billNote = loggedExpenses > 0 ? `Bill (${fmt(loggedExpenses)} logged)` : 'Est. bill ($600)';
+    } else {
+      bill     = BUDGET;
+      billNote = 'Est. bill ($600)';
+    }
 
     const startBal = runningBank;
     const endBal   = startBal + income - bill;
@@ -674,11 +688,12 @@ function renderProjections(currentMonthSpent) {
 
     const endCls   = moneyColor(endBal);
     const incLabel = i === 0 ? `Income (${fridayCount} Fri left)` : `Income (${fridayCount} Fridays)`;
+    const badge    = i === 0 ? 'Current' : i === 1 ? 'Next bill' : 'Est.';
 
     html += `<div class="proj-month-card ${i===0 ? 'current' : ''}">
       <div class="proj-month-header">
         <div class="proj-month-name">${lbl}</div>
-        <div class="proj-month-badge">${i===0 ? 'Current' : i===1 ? 'Next' : 'Est.'}</div>
+        <div class="proj-month-badge">${badge}</div>
       </div>
       <div class="proj-events">
         <div class="proj-event">
