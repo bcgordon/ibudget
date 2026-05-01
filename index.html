@@ -204,7 +204,7 @@
     .toggle.on .toggle-knob { transform:translateX(18px); }
 
     /* PIN modal */
-    #pin-modal { position:fixed; inset:0; z-index:500; background:rgba(0,0,0,0.45); display:flex; align-items:flex-end; }
+    #pin-modal, #import-modal { position:fixed; inset:0; z-index:500; background:rgba(0,0,0,0.45); display:flex; align-items:flex-end; }
     #pin-modal.hidden { display:none; }
     .pin-modal-sheet { background:var(--bg); border-radius:20px 20px 0 0; padding:20px 0 calc(var(--safe-bottom) + 20px); width:100%; display:flex; flex-direction:column; align-items:center; }
     .pin-modal-handle { width:36px; height:4px; border-radius:99px; background:var(--border2); margin-bottom:20px; }
@@ -252,8 +252,11 @@
 <div id="app">
   <div class="status-bar-spacer"></div>
   <div class="header">
-    <h1>Apple Card</h1>
-    <div class="budget-pill">$600 / mo</div>
+    <div>
+      <h1>Apple Card</h1>
+      <div id="month-label" style="font-size:12px;color:var(--text2);margin-top:1px;"></div>
+    </div>
+    <div class="budget-pill" id="budget-pill">$600 / mo</div>
   </div>
 
   <div class="scroll-area">
@@ -263,11 +266,11 @@
       <div class="stats">
         <div class="stat"><div class="stat-label">This month</div><div class="stat-value" id="stat-current">$0</div></div>
         <div class="stat"><div class="stat-label">Remaining</div><div class="stat-value good" id="stat-remaining">$600</div></div>
-        <div class="stat"><div class="stat-label">Budget</div><div class="stat-value">$600</div></div>
+        <div class="stat"><div class="stat-label">Budget</div><div class="stat-value" id="stat-budget">$600</div></div>
       </div>
 
       <div class="progress-card">
-        <div class="progress-header"><span id="prog-label">$0 of $600 used</span><span id="prog-pct">0%</span></div>
+        <div class="progress-header"><span id="prog-label">$0 used</span><span id="prog-pct">0%</span></div>
         <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
       </div>
 
@@ -276,6 +279,10 @@
         <div class="field-row">
           <div class="field"><label>Current total balance</label><input type="number" inputmode="decimal" id="input-total" placeholder="0.00" min="0" step="0.01" oninput="saveAndRender()"></div>
           <div class="field"><label>Next month's bill</label><input type="number" inputmode="decimal" id="input-bill" placeholder="0.00" min="0" step="0.01" oninput="saveAndRender()"></div>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>This month's budget <span style="color:var(--text3);font-size:11px;">(adjust for 5-week months)</span></label>
+          <input type="number" inputmode="decimal" id="input-budget" placeholder="600" min="0" step="1" oninput="saveAndRender()">
         </div>
       </div>
 
@@ -332,12 +339,24 @@
       </div>
 
       <div class="settings-section">
+        <div class="settings-label">Data</div>
+        <div class="settings-row" onclick="exportData()" style="cursor:pointer;">
+          <span class="settings-row-label">Export backup</span>
+          <span><span class="settings-row-value">Copy to clipboard</span><span class="settings-chevron">›</span></span>
+        </div>
+        <div class="settings-row" onclick="showImport()" style="cursor:pointer;">
+          <span class="settings-row-label">Restore from backup</span>
+          <span><span class="settings-row-value">Paste backup text</span><span class="settings-chevron">›</span></span>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <div class="settings-label">About</div>
-        <div class="settings-row" style="cursor:default;"><span class="settings-row-label">Monthly budget</span><span class="settings-row-value">$600</span></div>
+        <div class="settings-row" style="cursor:default;"><span class="settings-row-label">Monthly budget</span><span class="settings-row-value" id="settings-budget">$600</span></div>
         <div class="settings-row" style="cursor:default;"><span class="settings-row-label">Weekly income</span><span class="settings-row-value">$150 / Friday</span></div>
         <div class="settings-row" style="cursor:default;"><span class="settings-row-label">Bill due</span><span class="settings-row-value">Last day of month</span></div>
         <div class="settings-row" style="cursor:default;"><span class="settings-row-label">Storage</span><span class="settings-row-value">On-device</span></div>
-        <div class="settings-row" style="cursor:default;"><span class="settings-row-label">Version</span><span class="settings-row-value">1.2</span></div>
+        <div class="settings-row" style="cursor:default;"><span class="settings-row-label">Version</span><span class="settings-row-value">1.3</span></div>
       </div>
     </div>
 
@@ -387,10 +406,22 @@
   </div>
 </div>
 
+<!-- IMPORT MODAL -->
+<div id="import-modal" class="hidden">
+  <div class="pin-modal-sheet" style="padding:24px 24px calc(var(--safe-bottom) + 24px);">
+    <div class="pin-modal-handle"></div>
+    <div class="pin-modal-title" style="margin-bottom:8px;">Restore backup</div>
+    <p style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:16px;line-height:1.5;">Paste your backup text below.</p>
+    <textarea id="import-text" placeholder="Paste backup text here..." style="width:100%;height:120px;font-family:var(--mono);font-size:12px;padding:10px;border-radius:10px;border:0.5px solid var(--border2);background:var(--surface2);color:var(--text);outline:none;resize:none;"></textarea>
+    <button class="btn btn-primary" onclick="importData()" style="margin-top:12px;">Restore</button>
+    <button onclick="closeImport()" style="background:none;border:none;font-family:var(--font);font-size:14px;color:var(--text3);margin-top:12px;cursor:pointer;padding:4px;">Cancel</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-const BUDGET    = 600;
+let BUDGET      = 600; // overridden by state.budget on load
 const WEEKLY    = 150;
 const KEY       = 'actv2';
 const KEY_OLD   = 'actv1';
@@ -398,7 +429,7 @@ const PIN_KEY   = 'act_pin';
 const THEME_KEY = 'act_theme';
 const MONTHS    = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-let state = { total:0, bill:0, bank:0, expenses:[] };
+let state = { total:0, bill:0, bank:0, budget:600, expenses:[], activeMonth:null, archivedMonths:[] };
 
 /* ── THEME ── */
 function isDarkNow() {
@@ -539,12 +570,59 @@ function load() {
     const raw = localStorage.getItem(KEY) || localStorage.getItem(KEY_OLD);
     if (raw) {
       const parsed = JSON.parse(raw);
-      state = { total:0, bill:0, bank:0, expenses:[], ...parsed };
+      state = { total:0, bill:0, bank:0, budget:600, expenses:[], activeMonth:null, archivedMonths:[], ...parsed };
+      BUDGET = state.budget || 600;
       save();
     }
   } catch(e) {}
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {} }
+
+function currentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+}
+
+function updateMonthLabel() {
+  const now = new Date();
+  const label = MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+  const el = document.getElementById('month-label');
+  if (el) el.textContent = label;
+}
+
+function checkMonthRollover() {
+  const thisMonth = currentMonthKey();
+
+  // First time ever — just set the active month
+  if (!state.activeMonth) {
+    state.activeMonth = thisMonth;
+    save();
+    return;
+  }
+
+  // Same month — nothing to do
+  if (state.activeMonth === thisMonth) return;
+
+  // New month! Archive the old month's expenses and reset
+  const [archY, archM] = state.activeMonth.split('-').map(Number);
+  const archLabel = MONTHS[archM - 1] + ' ' + archY;
+
+  const archivedEntry = {
+    month: state.activeMonth,
+    label: archLabel,
+    expenses: state.expenses,
+    total: state.expenses.reduce((s,e) => s + e.amount, 0),
+    bill: state.bill,
+    budget: state.budget
+  };
+
+  state.archivedMonths = [archivedEntry, ...(state.archivedMonths || [])].slice(0, 12); // keep 12 months
+  state.expenses    = [];
+  state.activeMonth = thisMonth;
+  // Don't auto-reset bill/total/bank — user updates those manually
+  save();
+  showToast(`${archLabel} closed — expenses cleared`);
+}
 
 function currentSpent() {
   const base = Math.max(0, (state.total||0) - (state.bill||0));
@@ -571,22 +649,29 @@ function fmtSign(n) {
 }
 
 function saveAndRender() {
-  state.total = parseFloat(document.getElementById('input-total').value) || 0;
-  state.bill  = parseFloat(document.getElementById('input-bill').value)  || 0;
-  state.bank  = parseFloat(document.getElementById('input-bank').value)  || 0;
+  state.total   = parseFloat(document.getElementById('input-total').value)  || 0;
+  state.bill    = parseFloat(document.getElementById('input-bill').value)   || 0;
+  state.bank    = parseFloat(document.getElementById('input-bank').value)   || 0;
+  state.budget  = parseFloat(document.getElementById('input-budget').value) || 600;
+  BUDGET = state.budget;
   save(); render();
 }
 
 function render() {
+  BUDGET = state.budget || 600;
+  updateMonthLabel();
   const spent = currentSpent();
   const rem   = BUDGET - spent;
   const pct   = Math.min(100, Math.round((spent / BUDGET) * 100));
   const cls   = spendColor(spent);
 
   document.getElementById('stat-current').textContent = fmt(spent);
+  document.getElementById('stat-budget').textContent  = fmt(BUDGET);
+  document.getElementById('budget-pill').textContent  = `${fmt(BUDGET)} / mo`;
+  const sbEl = document.getElementById('settings-budget'); if (sbEl) sbEl.textContent = fmt(BUDGET);
   const remEl = document.getElementById('stat-remaining');
   remEl.textContent = fmt(rem); remEl.className = 'stat-value ' + cls;
-  document.getElementById('prog-label').textContent = `${fmt(spent)} of $600 used`;
+  document.getElementById('prog-label').textContent = `${fmt(spent)} of ${fmt(BUDGET)} used`;
   document.getElementById('prog-pct').textContent = pct + '%';
   const fill = document.getElementById('prog-fill');
   fill.style.width = pct + '%';
@@ -676,10 +761,10 @@ function renderProjections(currentMonthSpent) {
       billNote = 'Statement bill';
     } else if (i === 1) {
       bill     = may_bill;
-      billNote = loggedExpenses > 0 ? `Bill (${fmt(loggedExpenses)} logged)` : 'Est. bill ($600)';
+      billNote = loggedExpenses > 0 ? `Bill (${fmt(loggedExpenses)} logged)` : `Est. bill (${fmt(BUDGET)})`;
     } else {
       bill     = BUDGET;
-      billNote = 'Est. bill ($600)';
+      billNote = `Est. bill (${fmt(BUDGET)})`;
     }
 
     const startBal = runningBank;
@@ -752,15 +837,79 @@ function showToast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
 }
 
+/* ── EXPORT / IMPORT ── */
+function exportData() {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  const expenseLines = state.expenses.length
+    ? state.expenses.map(e => `  - ${e.loc}: $${e.amount} (${e.date})`).join('\n')
+    : '  (none)';
+
+  const text = [
+    `=== iBudget Backup — ${dateStr} ===`,
+    `total: ${state.total}`,
+    `bill: ${state.bill}`,
+    `bank: ${state.bank}`,
+    `expenses:`,
+    expenseLines,
+    `=== END ===`,
+    ``,
+    `RESTORE_JSON:${JSON.stringify(state)}`
+  ].join('\n');
+
+  navigator.clipboard.writeText(text)
+    .then(() => showToast('Backup copied to clipboard'))
+    .catch(() => {
+      // Fallback: show in a prompt so user can copy manually
+      prompt('Copy this backup text:', text);
+    });
+}
+
+function showImport() {
+  document.getElementById('import-text').value = '';
+  document.getElementById('import-modal').classList.remove('hidden');
+}
+
+function closeImport() {
+  document.getElementById('import-modal').classList.add('hidden');
+}
+
+function importData() {
+  const text = document.getElementById('import-text').value.trim();
+  if (!text) { showToast('Nothing to restore'); return; }
+
+  // Try to extract the JSON line
+  const match = text.match(/RESTORE_JSON:(.+)/);
+  if (!match) { showToast('Invalid backup — not recognised'); return; }
+
+  try {
+    const parsed = JSON.parse(match[1]);
+    state = { total:0, bill:0, bank:0, expenses:[], ...parsed };
+    save();
+    // Restore input fields
+    document.getElementById('input-total').value = state.total || '';
+    document.getElementById('input-bill').value  = state.bill  || '';
+    document.getElementById('input-bank').value  = state.bank  || '';
+    render();
+    closeImport();
+    showToast('Data restored successfully');
+  } catch(e) {
+    showToast('Could not parse backup');
+  }
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 
 loadTheme();
 load();
-if (state.total) document.getElementById('input-total').value = state.total;
-if (state.bill)  document.getElementById('input-bill').value  = state.bill;
-if (state.bank)  document.getElementById('input-bank').value  = state.bank;
+checkMonthRollover();
+updateMonthLabel();
+if (state.total)  document.getElementById('input-total').value  = state.total;
+if (state.bill)   document.getElementById('input-bill').value   = state.bill;
+if (state.bank)   document.getElementById('input-bank').value   = state.bank;
+if (state.budget) document.getElementById('input-budget').value = state.budget;
 render();
 initPinScreen();
 </script>
